@@ -1,40 +1,74 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"path"
 	"path/filepath"
+	"os"
 )
 
 type myMux struct{}
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	log.Printf("looking for EscapedPath: %s\n", req.URL.EscapedPath())
-	http.ServeFile(w, req, filepath.Join("var/www/html", path.Clean(req.URL.EscapedPath())))
+	// File to server
+	var fileName string
+	// Requested file
+	var reqfile = req.URL.EscapedPath()
+	if len(reqfile) > 10 && reqfile[:10] == "/entities/" {
+		// it is an MDQ request for specific file
+		if len(reqfile) > 19 && reqfile[:20] == "/entities/%7Bsha1%7D" {
+			// Already sha1 encoded. Send filename
+			fileName = reqfile
+		} else {
+			// URL encoded entityID
+			decodedValue, err := url.QueryUnescape(reqfile[10:])
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			h := sha1.New()
+			h.Write([]byte(decodedValue))
+			// send sha1 version of entityID
+			fileName = "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
+		}
+	} else {
+		// Either /entities/ -> send full feed by sending index.html
+		// Or someting else. Send that file :-)
+		fileName = reqfile
+	}
+
+	var fullPath = filepath.Join("/var/www/html", path.Clean(fileName))
+	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
+		if reqfile == fileName {
+			log.Printf("Missing file %s", fullPath)
+		} else {
+			log.Printf("Missing file %s, was %s", fullPath, reqfile)
+		}
+	} else {
+		if reqfile == fileName {
+			log.Printf("serving: %s\n", fileName)
+		} else {
+			log.Printf("looking for: %s, serving %s\n", reqfile, fileName)
+		}
+	}
+	http.ServeFile(w, req, fullPath)
 }
 
 func main() {
 	var (
-		host         = "mdx.qa.swamid.se"
 		port         = "443"
 		serverCert   = "/etc/dehydrated/certs/cert.pem"
 		srvKey       = "/etc/dehydrated/certs/privkey.pem"
 		//documentRoot = "/var/www/html"
 	)
 
-	/*server := &http.Server{
-		Addr:         ":" + port,
-		ReadTimeout:  5 * time.Minute, // 5 min to allow for delays when 'curl' on OSx prompts for username/password
-		WriteTimeout: 10 * time.Second,
-		TLSConfig:    &tls.Config{ServerName: host},
-	}*/
-
-
+	log.Print("Starting up\n")
 	mux := &myMux{}
-	// log.Fatal(http.ListenAndServe("127.0.0.1:8080", mux))
-
-	log.Printf("Starting HTTPS server on host %s and port %s", host, port)
 	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey , mux); err != nil {
 		log.Fatal(err)
 	}
