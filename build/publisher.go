@@ -62,8 +62,8 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func main() {
 	var (
 		port         = "443"
-		serverCert   = "/etc/dehydrated/certs/cert.pem"
-		srvKey       = "/etc/dehydrated/certs/privkey.pem"
+		serverCert   = "/etc/certs/cert.pem"
+		srvKey       = "/etc/certs/privkey.pem"
 		//documentRoot = "/var/www/html"
 	)
 
