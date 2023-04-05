@@ -17,16 +17,19 @@ type myMux struct{}
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// File to server
 	var fileName string
+	var baseURL = os.Getenv("baseURL")
+	var baseURLLength = len(baseURL)
+
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
-	if len(reqfile) > 10 && reqfile[:10] == "/entities/" {
+	if len(reqfile) > 10+baseURLLength && reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
 		// it is an MDQ request for specific file
-		if len(reqfile) > 19 && reqfile[:20] == "/entities/%7Bsha1%7D" {
+		if len(reqfile) > 19+baseURLLength && reqfile[baseURLLength:20+baseURLLength] == "/entities/%7Bsha1%7D" {
 			// Already sha1 encoded. Send filename
 			fileName = reqfile
 		} else {
 			// URL encoded entityID
-			decodedValue, err := url.QueryUnescape(reqfile[10:])
+			decodedValue, err := url.QueryUnescape(reqfile[10+baseURLLength:])
 			if err != nil {
 				log.Fatal(err)
 				return
@@ -34,7 +37,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			h := sha1.New()
 			h.Write([]byte(decodedValue))
 			// send sha1 version of entityID
-			fileName = "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
+			fileName = baseURL + "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
 		}
 	} else {
 		// Either /entities/ -> send full feed by sending index.html
@@ -66,6 +69,13 @@ func main() {
 		srvKey       = "/etc/certs/privkey.pem"
 		//documentRoot = "/var/www/html"
 	)
+
+	if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
+		log.Printf("Missing cert %s", serverCert)
+	}
+	if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
+		log.Printf("Missing key %s", srvKey)
+	}
 
 	log.Print("Starting up\n")
 	mux := &myMux{}
