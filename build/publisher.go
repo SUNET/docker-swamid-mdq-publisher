@@ -22,9 +22,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
-	if len(reqfile) > 10+baseURLLength && reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
+	if reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
 		// it is an MDQ request for specific file
-		if len(reqfile) > 19+baseURLLength && reqfile[baseURLLength:20+baseURLLength] == "/entities/%7Bsha1%7D" {
+		if (len(reqfile) > 19+baseURLLength && reqfile[baseURLLength:20+baseURLLength] == "/entities/%7Bsha1%7D") || len(reqfile) == 10+baseURLLength {
 			// Already sha1 encoded. Send filename
 			fileName = reqfile
 		} else {
@@ -39,6 +39,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// send sha1 version of entityID
 			fileName = baseURL + "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
 		}
+		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else {
 		// Either /entities/ -> send full feed by sending index.html
 		// Or someting else. Send that file :-)
