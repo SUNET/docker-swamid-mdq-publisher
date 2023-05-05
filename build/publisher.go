@@ -22,7 +22,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
-	if reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
+	if len(reqfile) > 10+baseURLLength && reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
 		// it is an MDQ request for specific file
 		if (len(reqfile) > 19+baseURLLength && reqfile[baseURLLength:20+baseURLLength] == "/entities/%7Bsha1%7D") || len(reqfile) == 10+baseURLLength {
 			// Already sha1 encoded. Send filename
