@@ -41,6 +41,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else {
+		if reqfile[baseURLLength:] == "/entities/" {
+			w.Header().Set("Content-Type", "application/samlmetadata+xml")
+		}
 		// Either /entities/ -> send full feed by sending index.html
 		// Or someting else. Send that file :-)
 		fileName = reqfile
