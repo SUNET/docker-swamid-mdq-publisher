@@ -76,7 +76,7 @@ func getEnv(key, fallback string) string {
 
 func main() {
 
-	var baseURL = getEnv("baseURL", "")
+    baseURL := getEnv("baseURL", "")
 
 	var (
 		port       = "443"
