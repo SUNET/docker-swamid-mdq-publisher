@@ -90,13 +90,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	serverCert := getEnv("PUBLISHER_CERT", "/etc/certs/cert.pem")
+	srvKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
+
 	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
 	if tls {
-		var (
-			serverCert = "/etc/certs/cert.pem"
-			srvKey     = "/etc/certs/privkey.pem"
-		)
-
 		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
 			log.Printf("Missing cert %s", serverCert)
 		}
