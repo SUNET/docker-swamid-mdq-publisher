@@ -82,9 +82,9 @@ func main() {
 
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
+	port := getEnv("PUBLISHER_PORT", "443")
 
 	var (
-		port       = "443"
 		serverCert = "/etc/certs/cert.pem"
 		srvKey     = "/etc/certs/privkey.pem"
 	)
