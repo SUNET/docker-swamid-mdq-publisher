@@ -12,12 +12,12 @@ import (
 	"path/filepath"
 )
 
-type myMux struct{}
+type myMux struct{ baseURL string }
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// File to server
 	var fileName string
-	var baseURL = os.Getenv("baseURL")
+	baseURL := m.baseURL
 	var baseURLLength = len(baseURL)
 
 	// Requested file
@@ -67,6 +67,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+
+	var baseURL = os.Getenv("baseURL")
+
 	var (
 		port       = "443"
 		serverCert = "/etc/certs/cert.pem"
@@ -82,7 +85,7 @@ func main() {
 	}
 
 	log.Print("Starting up\n")
-	mux := &myMux{}
+	mux := &myMux{baseURL: baseURL}
 	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
 		log.Fatal(err)
 	}
