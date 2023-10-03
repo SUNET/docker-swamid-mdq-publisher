@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 )
 
 type myMux struct {
@@ -83,22 +84,34 @@ func main() {
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
 	port := getEnv("PUBLISHER_PORT", "443")
-
-	var (
-		serverCert = "/etc/certs/cert.pem"
-		srvKey     = "/etc/certs/privkey.pem"
-	)
-
-	if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Missing cert %s", serverCert)
-	}
-	if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Missing key %s", srvKey)
-	}
-
-	log.Print("Starting up\n")
-	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
-	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
+	tls_env := getEnv("PUBLISHER_TLS", "True")
+	tls, err := strconv.ParseBool(tls_env)
+	if err != nil {
 		log.Fatal(err)
+	}
+
+	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
+	if tls {
+		var (
+			serverCert = "/etc/certs/cert.pem"
+			srvKey     = "/etc/certs/privkey.pem"
+		)
+
+		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
+			log.Printf("Missing cert %s", serverCert)
+		}
+		if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
+			log.Printf("Missing key %s", srvKey)
+		}
+
+		log.Print("Starting up\n")
+		if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
+			log.Fatal(err)
+		}
+
 	}
 }
