@@ -66,9 +66,17 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	http.ServeFile(w, req, fullPath)
 }
 
+func getEnv(key, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		value = fallback
+	}
+	return value
+}
+
 func main() {
 
-	var baseURL = os.Getenv("baseURL")
+	var baseURL = getEnv("baseURL", "")
 
 	var (
 		port       = "443"
