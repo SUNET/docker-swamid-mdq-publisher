@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
-	"os"
 )
 
 type myMux struct{}
@@ -68,9 +68,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var (
-		port         = "443"
-		serverCert   = "/etc/certs/cert.pem"
-		srvKey       = "/etc/certs/privkey.pem"
+		port       = "443"
+		serverCert = "/etc/certs/cert.pem"
+		srvKey     = "/etc/certs/privkey.pem"
 		//documentRoot = "/var/www/html"
 	)
 
@@ -83,7 +83,7 @@ func main() {
 
 	log.Print("Starting up\n")
 	mux := &myMux{}
-	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey , mux); err != nil {
+	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
 		log.Fatal(err)
 	}
 }
