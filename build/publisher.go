@@ -12,13 +12,17 @@ import (
 	"path/filepath"
 )
 
-type myMux struct{ baseURL string }
+type myMux struct {
+	baseURL      string
+	documentRoot string
+}
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// File to server
 	var fileName string
 	baseURL := m.baseURL
 	var baseURLLength = len(baseURL)
+	documentRoot := m.documentRoot
 
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
@@ -49,7 +53,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		fileName = reqfile
 	}
 
-	var fullPath = filepath.Join("/var/www/html", path.Clean(fileName))
+	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
 	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
 		if reqfile == fileName {
 			log.Printf("Missing file %s", fullPath)
@@ -76,13 +80,13 @@ func getEnv(key, fallback string) string {
 
 func main() {
 
-    baseURL := getEnv("baseURL", "")
+	baseURL := getEnv("baseURL", "")
+	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
 
 	var (
 		port       = "443"
 		serverCert = "/etc/certs/cert.pem"
 		srvKey     = "/etc/certs/privkey.pem"
-		//documentRoot = "/var/www/html"
 	)
 
 	if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
@@ -93,7 +97,7 @@ func main() {
 	}
 
 	log.Print("Starting up\n")
-	mux := &myMux{baseURL: baseURL}
+	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
 	if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
 		log.Fatal(err)
 	}
