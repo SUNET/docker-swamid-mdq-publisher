@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type myMux struct {
@@ -24,6 +25,19 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	baseURL := m.baseURL
 	var baseURLLength = len(baseURL)
 	documentRoot := m.documentRoot
+
+	xff := req.Header.Get("X-FORWARDED-FOR")
+	remoteAddr := req.RemoteAddr
+
+	var requestor string
+	if len(xff) > 0 {
+		requestor = xff
+	} else if len(remoteAddr) > 0 {
+		split_addr := strings.Split(remoteAddr, ":")
+		requestor = split_addr[0]
+	} else {
+		requestor = "UNKNOWN"
+	}
 
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
@@ -57,15 +71,15 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
 	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
 		if reqfile == fileName {
-			log.Printf("Missing file %s", fullPath)
+			log.Printf("Request from %s, Missing file %s", requestor, fullPath)
 		} else {
-			log.Printf("Missing file %s, was %s", fullPath, reqfile)
+			log.Printf("Request from %s, Missing file %s, was %s", requestor, fullPath, reqfile)
 		}
 	} else {
 		if reqfile == fileName {
-			log.Printf("serving: %s\n", fileName)
+			log.Printf("Request from %s, serving for: %s\n", requestor, fileName)
 		} else {
-			log.Printf("looking for: %s, serving %s\n", reqfile, fileName)
+			log.Printf("Request from %s, looking for: %s, serving: %s\n", requestor, reqfile, fileName)
 		}
 	}
 	http.ServeFile(w, req, fullPath)
