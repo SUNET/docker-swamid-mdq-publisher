@@ -68,20 +68,19 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		fileName = reqfile
 	}
 
+	var status int
 	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
+	var calculatedFrom string
 	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
-		if reqfile == fileName {
-			log.Printf("Request from %s, Missing file %s", requestor, fileName)
-		} else {
-			log.Printf("Request from %s, Missing file %s, was %s", requestor, fileName, reqfile)
-		}
+		status = 404
 	} else {
-		if reqfile == fileName {
-			log.Printf("Request from %s, serving for: %s\n", requestor, fileName)
-		} else {
-			log.Printf("Request from %s, looking for: %s, serving: %s\n", requestor, reqfile, fileName)
-		}
+		status = 200
 	}
+	if reqfile != fileName {
+		calculatedFrom = " (calculated from " + reqfile + ")"
+	}
+
+	log.Printf("%s %d %s%s", requestor, status, fileName, calculatedFrom)
 	http.ServeFile(w, req, fullPath)
 }
 
