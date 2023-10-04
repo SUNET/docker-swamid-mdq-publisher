@@ -76,7 +76,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		status = 404
 	} else if file.IsDir() {
 		status = 200
-        // http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
+		// http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
 		if strings.HasSuffix(reqfile, "/") == false {
 			status = 301
 		}
