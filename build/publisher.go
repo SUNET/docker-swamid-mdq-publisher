@@ -52,7 +52,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// URL encoded entityID
 			decodedValue, err := url.QueryUnescape(reqfile[10+baseURLLength:])
 			if err != nil {
-				log.Printf("Error decoding %s: %s", reqfile, err)
+
+				var extra string = " (error decoding " + reqfile + ": " + err.Error() + ")"
+				logger(requestor, userAgent, 500, reqfile, extra)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -89,7 +91,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		calculatedFrom = " (calculated from " + reqfile + ")"
 	}
 
-	log.Printf("%s (%s) %d %s%s", requestor, userAgent, status, fileName, calculatedFrom)
+	logger(requestor, userAgent, status, fileName, calculatedFrom)
 	http.ServeFile(w, req, fullPath)
 }
 
@@ -99,6 +101,10 @@ func getEnv(key, fallback string) string {
 		value = fallback
 	}
 	return value
+}
+
+func logger(requestor string, userAgent string, status int, fileName string, extra string) {
+	log.Printf("%s (%s) %d %s%s", requestor, userAgent, status, fileName, extra)
 }
 
 func main() {
