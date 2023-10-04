@@ -1,5 +1,4 @@
 FROM golang:1.21.1-bullseye AS build
-MAINTAINER bjorn@sunet.se
 WORKDIR /go/src/mdq-publisher
 COPY build .
 
