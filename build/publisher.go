@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"encoding/hex"
 	"errors"
 	"log"
@@ -58,7 +58,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
-			h := sha1.New()
+			h := sha1.New() // #nosec MDQ is based on sha1 hashes
 			h.Write([]byte(decodedValue))
 			// send sha1 version of entityID
 			fileName = baseURL + "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
