@@ -26,6 +26,8 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var baseURLLength = len(baseURL)
 	documentRoot := m.documentRoot
 
+	userAgent := req.UserAgent()
+
 	xff := req.Header.Get("X-FORWARDED-FOR")
 	remoteAddr := req.RemoteAddr
 
@@ -87,7 +89,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		calculatedFrom = " (calculated from " + reqfile + ")"
 	}
 
-	log.Printf("%s %d %s%s", requestor, status, fileName, calculatedFrom)
+	log.Printf("%s (%s) %d %s%s", requestor, userAgent, status, fileName, calculatedFrom)
 	http.ServeFile(w, req, fullPath)
 }
 
