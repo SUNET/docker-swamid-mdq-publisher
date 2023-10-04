@@ -50,7 +50,8 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// URL encoded entityID
 			decodedValue, err := url.QueryUnescape(reqfile[10+baseURLLength:])
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Error decoding %s: %s", reqfile, err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 			h := sha1.New()
