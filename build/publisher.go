@@ -151,6 +151,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
+		log.Print("Starting up (without TLS)\n")
 		if err := srv.ListenAndServe(); err != nil {
 			log.Fatal(err)
 		}
