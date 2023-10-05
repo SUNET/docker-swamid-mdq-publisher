@@ -43,6 +43,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Requested file
 	reqFile := req.URL.EscapedPath()
+	if !strings.HasPrefix(reqFile, baseURL) {
+		logger(requestor, userAgent, 400, reqFile, "")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+
+	}
 	fileName := reqFile
 
 	mdqBaseUrl := baseURL + "/entities/"
