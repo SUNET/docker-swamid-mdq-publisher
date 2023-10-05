@@ -59,7 +59,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
-				extra := fmt.Sprintf(" (error decoding %s: %s)", regFile, err)
+				extra := fmt.Sprintf("(error decoding %s: %s)", regFile, err)
 				logger(requestor, userAgent, 500, regFile, extra)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
@@ -94,7 +94,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		status = 200
 	}
 	if regFile != fileName {
-		calculatedFrom = " (calculated from " + regFile + ")"
+		calculatedFrom = "(calculated from " + regFile + ")"
 	}
 
 	logger(requestor, userAgent, status, fileName, calculatedFrom)
@@ -110,7 +110,11 @@ func getEnv(key, fallback string) string {
 }
 
 func logger(requestor string, userAgent string, status int, fileName string, extra string) {
-	log.Printf("%s (%s) %d %s%s", requestor, userAgent, status, fileName, extra)
+	delimiter := ""
+	if extra != "" {
+		delimiter = " "
+	}
+	log.Printf("%s (%s) %d %s%s%s", requestor, userAgent, status, fileName, delimiter, extra)
 }
 
 func main() {
