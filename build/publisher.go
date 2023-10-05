@@ -54,7 +54,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fileName = regFile
 		} else {
 			// URL encoded entityID
-			entityID := strings.TrimLeft(regFile, mdqBaseUrl)
+			entityID := strings.TrimPrefix(regFile, mdqBaseUrl)
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
