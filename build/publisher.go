@@ -4,6 +4,7 @@ import (
 	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -57,7 +58,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
-				var extra string = " (error decoding " + reqfile + ": " + err.Error() + ")"
+				extra := fmt.Sprintf(" (error decoding %s: %s)", reqfile, err)
 				logger(requestor, userAgent, 500, reqfile, extra)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
