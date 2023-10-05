@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type myMux struct {
@@ -122,6 +123,12 @@ func main() {
 	srvKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
 
 	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
+	srv := http.Server{
+		Addr:         "0.0.0.0:" + port,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		Handler:      mux,
+	}
 	if tls {
 		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
 			log.Printf("Missing cert %s", serverCert)
@@ -131,11 +138,11 @@ func main() {
 		}
 
 		log.Print("Starting up\n")
-		if err := http.ListenAndServeTLS("0.0.0.0:"+port, serverCert, srvKey, mux); err != nil {
+		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			log.Fatal(err)
 		}
 
