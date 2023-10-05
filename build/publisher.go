@@ -44,22 +44,22 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Requested file
-	var reqfile = req.URL.EscapedPath()
+	var regFile = req.URL.EscapedPath()
 
 	mdqBaseUrl := baseURL + "/entities/"
-	if strings.HasPrefix(reqfile, mdqBaseUrl) {
+	if strings.HasPrefix(regFile, mdqBaseUrl) {
 		// it is an MDQ request for specific file
-		if strings.HasPrefix(reqfile, mdqBaseUrl+"%7Bsha1%7D") {
+		if strings.HasPrefix(regFile, mdqBaseUrl+"%7Bsha1%7D") {
 			// Already sha1 encoded. Send filename
-			fileName = reqfile
+			fileName = regFile
 		} else {
 			// URL encoded entityID
-			entityID := strings.TrimLeft(reqfile, mdqBaseUrl)
+			entityID := strings.TrimLeft(regFile, mdqBaseUrl)
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
-				extra := fmt.Sprintf(" (error decoding %s: %s)", reqfile, err)
-				logger(requestor, userAgent, 500, reqfile, extra)
+				extra := fmt.Sprintf(" (error decoding %s: %s)", regFile, err)
+				logger(requestor, userAgent, 500, regFile, extra)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -70,12 +70,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else {
-		if reqfile[baseURLLength:] == "/entities/" {
+		if regFile[baseURLLength:] == "/entities/" {
 			w.Header().Set("Content-Type", "application/samlmetadata+xml")
 		}
 		// Either /entities/ -> send full feed by sending index.html
 		// Or someting else. Send that file :-)
-		fileName = reqfile
+		fileName = regFile
 	}
 
 	var status int
@@ -86,14 +86,14 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	} else if file.IsDir() {
 		status = 200
 		// http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
-		if !strings.HasSuffix(reqfile, "/") {
+		if !strings.HasSuffix(regFile, "/") {
 			status = 301
 		}
 	} else {
 		status = 200
 	}
-	if reqfile != fileName {
-		calculatedFrom = " (calculated from " + reqfile + ")"
+	if regFile != fileName {
+		calculatedFrom = " (calculated from " + regFile + ")"
 	}
 
 	logger(requestor, userAgent, status, fileName, calculatedFrom)
@@ -117,8 +117,8 @@ func main() {
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
 	port := getEnv("PUBLISHER_PORT", "443")
-	tls_env := getEnv("PUBLISHER_TLS", "True")
-	tls, err := strconv.ParseBool(tls_env)
+	tlsEnv := getEnv("PUBLISHER_TLS", "True")
+	tls, err := strconv.ParseBool(tlsEnv)
 	if err != nil {
 		log.Fatal(err)
 	}
