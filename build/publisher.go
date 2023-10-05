@@ -24,7 +24,6 @@ type myMux struct {
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// File to server
 	baseURL := m.baseURL
-	var baseURLLength = len(baseURL)
 	documentRoot := m.documentRoot
 
 	userAgent := req.UserAgent()
@@ -48,7 +47,10 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	mdqBaseUrl := baseURL + "/entities/"
 	shaUrl := mdqBaseUrl + "%7Bsha1%7D"
-	if strings.HasPrefix(reqFile, mdqBaseUrl) {
+	if reqFile == mdqBaseUrl {
+		// /entities/ -> send full feed by sending index.html force Content-Type to make clients happier
+		w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	} else if strings.HasPrefix(reqFile, mdqBaseUrl) {
 		// it is an MDQ request for specific file
 		if strings.HasPrefix(reqFile, shaUrl) {
 			// Already sha1 encoded. Send filename
@@ -69,12 +71,6 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fileName = shaUrl + hex.EncodeToString(h.Sum(nil))
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
-	} else {
-		if reqFile[baseURLLength:] == "/entities/" {
-			w.Header().Set("Content-Type", "application/samlmetadata+xml")
-		}
-		// Either /entities/ -> send full feed by sending index.html
-		// Or someting else. Send that file :-)
 	}
 
 	var status int
