@@ -23,7 +23,6 @@ type myMux struct {
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// File to server
-	var fileName string
 	baseURL := m.baseURL
 	var baseURLLength = len(baseURL)
 	documentRoot := m.documentRoot
@@ -44,7 +43,8 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Requested file
-	var reqFile = req.URL.EscapedPath()
+	reqFile := req.URL.EscapedPath()
+	fileName := reqFile
 
 	mdqBaseUrl := baseURL + "/entities/"
 	shaUrl := mdqBaseUrl + "%7Bsha1%7D"
@@ -52,7 +52,6 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// it is an MDQ request for specific file
 		if strings.HasPrefix(reqFile, shaUrl) {
 			// Already sha1 encoded. Send filename
-			fileName = reqFile
 		} else {
 			// URL encoded entityID
 			entityID := strings.TrimPrefix(reqFile, mdqBaseUrl)
@@ -76,7 +75,6 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		// Either /entities/ -> send full feed by sending index.html
 		// Or someting else. Send that file :-)
-		fileName = reqFile
 	}
 
 	var status int
