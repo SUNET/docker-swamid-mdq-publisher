@@ -44,14 +44,17 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Requested file
 	var reqfile = req.URL.EscapedPath()
-	if len(reqfile) > 10+baseURLLength && reqfile[baseURLLength:10+baseURLLength] == "/entities/" {
+
+	mdqBaseUrl := baseURL + "/entities/"
+	if strings.HasPrefix(reqfile, mdqBaseUrl) {
 		// it is an MDQ request for specific file
-		if (len(reqfile) > 19+baseURLLength && reqfile[baseURLLength:20+baseURLLength] == "/entities/%7Bsha1%7D") || len(reqfile) == 10+baseURLLength {
+		if strings.HasPrefix(reqfile, mdqBaseUrl+"%7Bsha1%7D") {
 			// Already sha1 encoded. Send filename
 			fileName = reqfile
 		} else {
 			// URL encoded entityID
-			decodedValue, err := url.QueryUnescape(reqfile[10+baseURLLength:])
+			entityID := strings.TrimLeft(reqfile, mdqBaseUrl)
+			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
 				var extra string = " (error decoding " + reqfile + ": " + err.Error() + ")"
