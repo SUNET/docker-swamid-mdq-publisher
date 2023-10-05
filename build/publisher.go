@@ -47,9 +47,10 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var regFile = req.URL.EscapedPath()
 
 	mdqBaseUrl := baseURL + "/entities/"
+	shaUrl := mdqBaseUrl + "%7Bsha1%7D"
 	if strings.HasPrefix(regFile, mdqBaseUrl) {
 		// it is an MDQ request for specific file
-		if strings.HasPrefix(regFile, mdqBaseUrl+"%7Bsha1%7D") {
+		if strings.HasPrefix(regFile, shaUrl) {
 			// Already sha1 encoded. Send filename
 			fileName = regFile
 		} else {
@@ -66,7 +67,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			h := sha1.New() // #nosec MDQ is based on sha1 hashes
 			h.Write([]byte(decodedValue))
 			// send sha1 version of entityID
-			fileName = baseURL + "/entities/%7Bsha1%7D" + hex.EncodeToString(h.Sum(nil))
+			fileName = shaUrl + hex.EncodeToString(h.Sum(nil))
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else {
