@@ -44,23 +44,23 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Requested file
-	var regFile = req.URL.EscapedPath()
+	var reqFile = req.URL.EscapedPath()
 
 	mdqBaseUrl := baseURL + "/entities/"
 	shaUrl := mdqBaseUrl + "%7Bsha1%7D"
-	if strings.HasPrefix(regFile, mdqBaseUrl) {
+	if strings.HasPrefix(reqFile, mdqBaseUrl) {
 		// it is an MDQ request for specific file
-		if strings.HasPrefix(regFile, shaUrl) {
+		if strings.HasPrefix(reqFile, shaUrl) {
 			// Already sha1 encoded. Send filename
-			fileName = regFile
+			fileName = reqFile
 		} else {
 			// URL encoded entityID
-			entityID := strings.TrimPrefix(regFile, mdqBaseUrl)
+			entityID := strings.TrimPrefix(reqFile, mdqBaseUrl)
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
-				extra := fmt.Sprintf("(error decoding %s: %s)", regFile, err)
-				logger(requestor, userAgent, 500, regFile, extra)
+				extra := fmt.Sprintf("(error decoding %s: %s)", reqFile, err)
+				logger(requestor, userAgent, 500, reqFile, extra)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -71,12 +71,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else {
-		if regFile[baseURLLength:] == "/entities/" {
+		if reqFile[baseURLLength:] == "/entities/" {
 			w.Header().Set("Content-Type", "application/samlmetadata+xml")
 		}
 		// Either /entities/ -> send full feed by sending index.html
 		// Or someting else. Send that file :-)
-		fileName = regFile
+		fileName = reqFile
 	}
 
 	var status int
@@ -87,14 +87,14 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	} else if file.IsDir() {
 		status = 200
 		// http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
-		if !strings.HasSuffix(regFile, "/") {
+		if !strings.HasSuffix(reqFile, "/") {
 			status = 301
 		}
 	} else {
 		status = 200
 	}
-	if regFile != fileName {
-		calculatedFrom = "(calculated from " + regFile + ")"
+	if reqFile != fileName {
+		calculatedFrom = "(calculated from " + reqFile + ")"
 	}
 
 	logger(requestor, userAgent, status, fileName, calculatedFrom)
