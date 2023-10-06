@@ -108,6 +108,9 @@ func getEnv(key, fallback string) string {
 	return value
 }
 
+// The status codes logged below are assumptions since we don't know what http.Serve will return.
+// This function should probably be replaced hlog sometime™
+// https://github.com/rs/zerolog/tree/master#integration-with-nethttp
 func logger(requestor string, userAgent string, status int, fileName string, extra string) {
 	delimiter := ""
 	if extra != "" {
