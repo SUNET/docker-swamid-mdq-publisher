@@ -57,10 +57,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// /entities/ -> send full feed by sending index.html force Content-Type to make clients happier
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	} else if strings.HasPrefix(reqFile, mdqBaseUrl) {
-		// it is an MDQ request for specific file
-		if strings.HasPrefix(reqFile, shaUrl) {
-			// Already sha1 encoded. Send filename
-		} else {
+		// Encoded request? If not encode the entityID and use it as the requested file
+		// In both senarios set the correct Content-Type
+		if !strings.HasPrefix(reqFile, shaUrl) {
 			// URL encoded entityID
 			entityID := strings.TrimPrefix(reqFile, mdqBaseUrl)
 			decodedValue, err := url.QueryUnescape(entityID)
