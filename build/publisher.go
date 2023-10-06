@@ -44,7 +44,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Requested file
 	reqFile := req.URL.EscapedPath()
 	if !strings.HasPrefix(reqFile, baseURL) {
-		logger(requestor, userAgent, 400, reqFile, "(request to outside baseUrl)")
+		logger(requestor, userAgent, http.StatusNotFound, reqFile, "(request to outside baseUrl)")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 
@@ -82,15 +82,15 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
 	var calculatedFrom string
 	if file, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
-		status = 404
+		status = http.StatusNotFound
 	} else if file.IsDir() {
-		status = 200
+		status = http.StatusOK
 		// http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
 		if !strings.HasSuffix(reqFile, "/") {
-			status = 301
+			status = http.StatusMovedPermanently
 		}
 	} else {
-		status = 200
+		status = http.StatusOK
 	}
 	if reqFile != fileName {
 		calculatedFrom = "(calculated from " + reqFile + ")"
