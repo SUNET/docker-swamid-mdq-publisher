@@ -44,7 +44,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Requested file
 	reqFile := req.URL.EscapedPath()
 	if !strings.HasPrefix(reqFile, baseURL) {
-		logger(requestor, userAgent, 400, reqFile, "")
+		logger(requestor, userAgent, 400, reqFile, "(request to outside baseUrl)")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 
