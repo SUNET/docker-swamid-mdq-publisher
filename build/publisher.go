@@ -35,8 +35,8 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if len(xff) > 0 {
 		requestor = xff
 	} else if len(remoteAddr) > 0 {
-		split_addr := strings.Split(remoteAddr, ":")
-		requestor = split_addr[0]
+		splitAddr := strings.Split(remoteAddr, ":")
+		requestor = splitAddr[0]
 	} else {
 		requestor = "UNKNOWN"
 	}
