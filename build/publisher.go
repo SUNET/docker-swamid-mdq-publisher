@@ -124,6 +124,13 @@ func main() {
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
 	port := getEnv("PUBLISHER_PORT", "443")
+	// 90 sec should give time (with some headroom) for a 10 BASE-T connection to fetch our (current) biggest files XML files (80Mb)
+	writeTimeoutEnv := getEnv("PUBLISHER_WRITETIMEOUT", "90s")
+	writeTimeout, err := time.ParseDuration(writeTimeoutEnv)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	tlsEnv := getEnv("PUBLISHER_TLS", "True")
 	tls, err := strconv.ParseBool(tlsEnv)
 	if err != nil {
@@ -137,7 +144,7 @@ func main() {
 	srv := http.Server{
 		Addr:         "0.0.0.0:" + port,
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		WriteTimeout: writeTimeout,
 		Handler:      mux,
 	}
 	if tls {
