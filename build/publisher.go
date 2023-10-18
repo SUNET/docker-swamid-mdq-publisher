@@ -124,7 +124,7 @@ func main() {
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
 	port := getEnv("PUBLISHER_PORT", "443")
-	// 90 sec should give time (with some headroom) for a 10 BASE-T connection to fetch our (current) biggest files XML files (80Mb)
+	// 90 sec should give time (with some headroom) for a 10 BASE-T connection to fetch our (current) biggest XML files (80MB)
 	writeTimeoutEnv := getEnv("PUBLISHER_WRITETIMEOUT", "90s")
 	writeTimeout, err := time.ParseDuration(writeTimeoutEnv)
 	if err != nil {
