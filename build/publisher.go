@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,8 +43,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if len(xff) > 0 {
 		requestor = xff
 	} else if len(remoteAddr) > 0 {
-		splitAddr := strings.Split(remoteAddr, ":")
-		requestor = splitAddr[0]
+		requestor, _, _ = net.SplitHostPort(remoteAddr)
 	} else {
 		requestor = "UNKNOWN"
 	}
