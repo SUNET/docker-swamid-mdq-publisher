@@ -30,18 +30,15 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	baseURL := m.baseURL
 	documentRoot := m.documentRoot
 
-	xff := ""
-
 	xffs := req.Header["X-Forwarded-For"]
 	if len(xffs) > 0 {
 		// From HAProxy's documentation:
 		// Since this header is always appended at the end of the existing header list, the server must be configured to always use the last occurrence of this header only.
-		xff = xffs[len(xffs)-1]
+		xff := xffs[len(xffs)-1]
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("x_forwarded_for", xff)
+		})
 	}
-
-	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Str("x_forwarded_for", xff)
-	})
 
 	// Requested file
 	reqFile := req.URL.EscapedPath()
