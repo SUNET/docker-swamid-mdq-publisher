@@ -40,9 +40,9 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var requestor string
-	if len(xff) > 0 {
+	if xff != "" {
 		requestor = xff
-	} else if len(remoteAddr) > 0 {
+	} else if remoteAddr != "" {
 		requestor, _, _ = net.SplitHostPort(remoteAddr)
 	} else {
 		requestor = "UNKNOWN"
