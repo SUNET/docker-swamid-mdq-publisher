@@ -43,7 +43,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if xff != "" {
 		requestor = xff
 	} else if remoteAddr != "" {
-		requestor, _, _ = net.SplitHostPort(remoteAddr)
+		var err error
+		requestor, _, err = net.SplitHostPort(remoteAddr)
+		if err != nil {
+			requestor = "ERROR: " + err.Error()
+
+		}
 	} else {
 		requestor = "UNKNOWN"
 	}
