@@ -28,8 +28,15 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	userAgent := req.UserAgent()
 
-	xff := req.Header.Get("X-FORWARDED-FOR")
+	xff := ""
 	remoteAddr := req.RemoteAddr
+
+	xffs := req.Header["X-Forwarded-For"]
+	if len(xffs) > 0 {
+		// From HAProxy's documentation:
+		// Since this header is always appended at the end of the existing header list, the server must be configured to always use the last occurrence of this header only.
+		xff = xffs[len(xffs)-1]
+	}
 
 	var requestor string
 	if len(xff) > 0 {
