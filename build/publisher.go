@@ -4,8 +4,6 @@ import (
 	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/justinas/alice"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 )
 
 type myMux struct {
@@ -22,32 +24,27 @@ type myMux struct {
 }
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+	logger := hlog.FromRequest(req)
 	// File to server
 	baseURL := m.baseURL
 	documentRoot := m.documentRoot
 
-	userAgent := req.UserAgent()
-
-	xff := req.Header.Get("X-FORWARDED-FOR")
-	remoteAddr := req.RemoteAddr
-
-	var requestor string
-	if len(xff) > 0 {
-		requestor = xff
-	} else if len(remoteAddr) > 0 {
-		splitAddr := strings.Split(remoteAddr, ":")
-		requestor = splitAddr[0]
-	} else {
-		requestor = "UNKNOWN"
+	xffs := req.Header["X-Forwarded-For"]
+	if len(xffs) > 0 {
+		// From HAProxy's documentation:
+		// Since this header is always appended at the end of the existing header list, the server must be configured to always use the last occurrence of this header only.
+		xff := xffs[len(xffs)-1]
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			return c.Str("x_forwarded_for", xff)
+		})
 	}
 
 	// Requested file
 	reqFile := req.URL.EscapedPath()
 	if !strings.HasPrefix(reqFile, baseURL) {
-		logger(requestor, userAgent, http.StatusNotFound, reqFile, "(request to outside baseUrl)")
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
-
 	}
 	fileName := reqFile
 
@@ -65,8 +62,13 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			decodedValue, err := url.QueryUnescape(entityID)
 			if err != nil {
 
-				extra := fmt.Sprintf("(error decoding %s: %s)", reqFile, err)
-				logger(requestor, userAgent, 500, reqFile, extra)
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return c.Str("decoding_error", err.Error())
+				})
+
+				logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return c.Str("req_file", reqFile)
+				})
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -78,25 +80,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	}
 
-	var status int
 	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
-	var calculatedFrom string
-	if file, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
-		status = http.StatusNotFound
-	} else if file.IsDir() {
-		status = http.StatusOK
-		// http.ServeFile serves a redirect if a request for a directoy doesn't end with a slash - better log that
-		if !strings.HasSuffix(reqFile, "/") {
-			status = http.StatusMovedPermanently
-		}
-	} else {
-		status = http.StatusOK
-	}
-	if reqFile != fileName {
-		calculatedFrom = "(calculated from " + reqFile + ")"
-	}
 
-	logger(requestor, userAgent, status, fileName, calculatedFrom)
+	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str("filename", fileName)
+	})
+
 	http.ServeFile(w, req, fullPath)
 }
 
@@ -108,18 +97,36 @@ func getEnv(key, fallback string) string {
 	return value
 }
 
-// The status codes logged below are assumptions since we don't know what http.Serve will return.
-// This function should probably be replaced hlog sometime™
-// https://github.com/rs/zerolog/tree/master#integration-with-nethttp
-func logger(requestor string, userAgent string, status int, fileName string, extra string) {
-	delimiter := ""
-	if extra != "" {
-		delimiter = " "
-	}
-	log.Printf("%s (%s) %d %s%s%s", requestor, userAgent, status, fileName, delimiter, extra)
+// Based on example at https://github.com/rs/zerolog#integration-with-nethttp
+func aliceRequestLoggerChain(zlog zerolog.Logger) alice.Chain {
+	chain := alice.New()
+
+	chain = chain.Append(hlog.NewHandler(zlog))
+
+	chain = chain.Append(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
+		hlog.FromRequest(r).Info().
+			Str("method", r.Method).
+			Stringer("url", r.URL).
+			Int("status", status).
+			Int("size", size).
+			Dur("duration", duration).
+			Msg("")
+	}))
+
+	chain = chain.Append(hlog.RemoteIPHandler("ip"))
+	chain = chain.Append(hlog.UserAgentHandler("user_agent"))
+	chain = chain.Append(hlog.RefererHandler("referer"))
+	chain = chain.Append(hlog.RequestIDHandler("req_id", "Request-Id"))
+
+	return chain
 }
 
 func main() {
+
+	zlog := zerolog.New(os.Stdout).With().
+		Timestamp().
+		Str("service", "swamid-mdq-publisher").
+		Logger()
 
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
@@ -128,41 +135,44 @@ func main() {
 	writeTimeoutEnv := getEnv("PUBLISHER_WRITETIMEOUT", "90s")
 	writeTimeout, err := time.ParseDuration(writeTimeoutEnv)
 	if err != nil {
-		log.Fatal(err)
+		zlog.Fatal().Err(err).Msg("Couldn't parse duration")
 	}
 
 	tlsEnv := getEnv("PUBLISHER_TLS", "True")
 	tls, err := strconv.ParseBool(tlsEnv)
 	if err != nil {
-		log.Fatal(err)
+		zlog.Fatal().Err(err).Msg("Couldn't parse bool")
 	}
 
 	serverCert := getEnv("PUBLISHER_CERT", "/etc/certs/cert.pem")
 	srvKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
 
+	chain := aliceRequestLoggerChain(zlog)
+
 	mux := &myMux{baseURL: baseURL, documentRoot: documentRoot}
+
+	httpHandler := chain.Then(mux)
 	srv := http.Server{
 		Addr:         "0.0.0.0:" + port,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: writeTimeout,
-		Handler:      mux,
+		Handler:      httpHandler,
 	}
+	zlog.Info().Bool("tls", tls).Msg("Starting up")
 	if tls {
 		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
-			log.Printf("Missing cert %s", serverCert)
+			zlog.Fatal().Err(err).Msg("Missing cert: " + serverCert)
 		}
 		if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
-			log.Printf("Missing key %s", srvKey)
+			zlog.Fatal().Err(err).Msg("Missing key: " + srvKey)
 		}
 
-		log.Print("Starting up\n")
 		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != nil {
-			log.Fatal(err)
+			zlog.Fatal().Err(err).Msg("Listen failed")
 		}
 	} else {
-		log.Print("Starting up (without TLS)\n")
 		if err := srv.ListenAndServe(); err != nil {
-			log.Fatal(err)
+			zlog.Fatal().Err(err).Msg("Listen failed")
 		}
 
 	}
