@@ -1,4 +1,4 @@
-FROM golang:1.21.5-bullseye AS build
+FROM golang:1.22.2-bullseye AS build
 WORKDIR /go/src/mdq-publisher
 COPY build .
 
