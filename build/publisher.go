@@ -43,8 +43,18 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Requested file
 	reqFile := req.URL.EscapedPath()
 	if !strings.HasPrefix(reqFile, baseURL) {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
+		// Handle Haproxy's default method and path for Health checks
+		// https://www.haproxy.com/documentation/haproxy-configuration-tutorials/reliability/health-checks/#http-health-checks
+		if req.Method == "OPTIONS" && reqFile == "/" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Meep meep"))
+
+			return
+
+		} else {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 	}
 	fileName := reqFile
 
