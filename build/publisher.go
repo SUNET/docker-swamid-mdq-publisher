@@ -45,7 +45,10 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// Handle Haproxy's default method and path for Health checks
 		// https://www.haproxy.com/documentation/haproxy-configuration-tutorials/reliability/health-checks/#http-health-checks
 		if req.Method == "OPTIONS" && reqFile == "/" {
-			w.Write([]byte("Meep meep"))
+			_, err := w.Write([]byte("Meep meep"))
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
 
 			return
 
