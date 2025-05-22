@@ -47,6 +47,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "OPTIONS" && reqFile == "/" {
 			_, err := w.Write([]byte("Meep meep"))
 			if err != nil {
+				logger.Err(err).Msg("Meeping failed")
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 
