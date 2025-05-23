@@ -24,7 +24,6 @@ type myMux struct {
 }
 
 func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-
 	logger := hlog.FromRequest(req)
 	// File to server
 	baseURL := m.baseURL
@@ -43,8 +42,21 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Requested file
 	reqFile := req.URL.EscapedPath()
 	if !strings.HasPrefix(reqFile, baseURL) {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
+		// Handle Haproxy's default method and path for Health checks
+		// https://www.haproxy.com/documentation/haproxy-configuration-tutorials/reliability/health-checks/#http-health-checks
+		if req.Method == "OPTIONS" && reqFile == "/" {
+			_, err := w.Write([]byte("Meep meep"))
+			if err != nil {
+				logger.Err(err).Msg("Meeping failed")
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+
+			return
+
+		} else {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
 	}
 	fileName := reqFile
 
@@ -80,7 +92,7 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	}
 
-	var fullPath = filepath.Join(documentRoot, path.Clean(fileName))
+	fullPath := filepath.Join(documentRoot, path.Clean(fileName))
 
 	logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
 		return c.Str("filename", fileName)
@@ -122,7 +134,6 @@ func aliceRequestLoggerChain(zlog zerolog.Logger) alice.Chain {
 }
 
 func main() {
-
 	zlog := zerolog.New(os.Stdout).With().
 		Timestamp().
 		Str("service", "swamid-mdq-publisher").
@@ -174,6 +185,5 @@ func main() {
 		if err := srv.ListenAndServe(); err != nil {
 			zlog.Fatal().Err(err).Msg("Listen failed")
 		}
-
 	}
 }
