@@ -5,11 +5,13 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +20,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 )
+
+var version = "unspecified"
 
 type myMux struct {
 	baseURL      string
@@ -134,11 +138,24 @@ func aliceRequestLoggerChain(zlog zerolog.Logger) alice.Chain {
 	return chain
 }
 
-func main() {
-	zlog := zerolog.New(os.Stdout).With().
+func newLogger(service, hostname string) zerolog.Logger {
+	return zerolog.New(os.Stderr).With().
 		Timestamp().
-		Str("service", "swamid-mdq-publisher").
+		Str("service", service).
+		Str("hostname", hostname).
+		Str("server_version", version).
+		Str("go_version", runtime.Version()).
 		Logger()
+}
+
+func main() {
+	service := "swamid-mdq-publisher"
+	hostname, err := os.Hostname()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "unable to get hostname, can not setup logging")
+		os.Exit(1)
+	}
+	zlog := newLogger(service, hostname)
 
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
