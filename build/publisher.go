@@ -34,13 +34,22 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	baseURL := m.baseURL
 	documentRoot := m.documentRoot
 
-	xffs := req.Header["X-Forwarded-For"]
-	if len(xffs) > 0 {
-		// From HAProxy's documentation:
-		// Since this header is always appended at the end of the existing header list, the server must be configured to always use the last occurrence of this header only.
-		xff := xffs[len(xffs)-1]
+	incoming_xffs := req.Header["X-Forwarded-For"]
+	merged_xffs := []string{}
+	if len(incoming_xffs) > 0 {
+		// Handle X-Forwarded-For as described by Mozilla
+		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For
+		for _, header := range incoming_xffs {
+			adresses := strings.Split(header, ",")
+			for _, adress := range adresses {
+				adress := strings.TrimSpace(adress)
+				merged_xffs = append(merged_xffs, adress)
+			}
+
+		}
+
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("x_forwarded_for", xff)
+			return c.Strs("x_forwarded_for", merged_xffs)
 		})
 	}
 
