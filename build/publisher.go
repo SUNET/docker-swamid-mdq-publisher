@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"crypto/tls"
 	"encoding/hex"
@@ -9,11 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/justinas/alice"
@@ -216,6 +219,23 @@ func main() {
 		Handler:      httpHandler,
 		TLSConfig:    tlsCfg,
 	}
+
+	idleConnsClosed := make(chan struct{})
+	go func(shutdownTimeout time.Duration) {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+
+		zlog.Info().Msgf("Graceful shutdown (timeout %s)", shutdownTimeout)
+
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			zlog.Err(err).Msg("Graceful shutdown failed")
+		}
+		close(idleConnsClosed)
+	}(writeTimeout)
+
 	zlog.Info().Bool("tls", tlsBool).Msg("Starting up")
 	if tlsBool {
 		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
@@ -225,12 +245,13 @@ func main() {
 			zlog.Fatal().Err(err).Msg("Missing key: " + srvKey)
 		}
 
-		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != nil {
-			zlog.Fatal().Err(err).Msg("Listen failed")
+		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != http.ErrServerClosed {
+			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
 	} else {
-		if err := srv.ListenAndServe(); err != nil {
-			zlog.Fatal().Err(err).Msg("Listen failed")
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
 	}
+	<-idleConnsClosed
 }
