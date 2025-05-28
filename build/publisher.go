@@ -225,7 +225,7 @@ func main() {
 	}
 
 	serverCert := getEnv("PUBLISHER_CERT", "/etc/certs/cert.pem")
-	srvKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
+	serverKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
 
 	chain := aliceRequestLoggerChain(zlog)
 
@@ -252,7 +252,7 @@ func main() {
 	}
 
 	if tlsBool {
-		httpServerCertStore, err := newCertStore(serverCert, srvKey)
+		httpServerCertStore, err := newCertStore(serverCert, serverKey)
 		if err != nil {
 			zlog.Fatal().Err(err).Msg("Unable to load x509 HTTP server cert from disk")
 			os.Exit(1)
@@ -306,8 +306,8 @@ func main() {
 		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
 			zlog.Fatal().Err(err).Msg("Missing cert: " + serverCert)
 		}
-		if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
-			zlog.Fatal().Err(err).Msg("Missing key: " + srvKey)
+		if _, err := os.Stat(serverKey); errors.Is(err, os.ErrNotExist) {
+			zlog.Fatal().Err(err).Msg("Missing key: " + serverKey)
 		}
 
 		if err := srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
