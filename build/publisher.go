@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -160,6 +161,44 @@ func newLogger(service, hostname string) zerolog.Logger {
 		Logger()
 }
 
+type certStore struct {
+	cert *tls.Certificate
+	pem  string
+	key  string
+	mtx  sync.RWMutex
+}
+
+func (cs *certStore) getServerCertficate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	cs.mtx.RLock()
+	defer cs.mtx.RUnlock()
+	return cs.cert, nil
+}
+
+func (cs *certStore) loadCert() error {
+	cert, err := tls.LoadX509KeyPair(cs.pem, cs.key)
+	if err != nil {
+		return fmt.Errorf("unable to load x509 cert: %w", err)
+	}
+	cs.mtx.Lock()
+	cs.cert = &cert
+	cs.mtx.Unlock()
+
+	return nil
+}
+
+func newCertStore(pem string, key string) (*certStore, error) {
+	cs := &certStore{
+		pem: pem,
+		key: key,
+	}
+	err := cs.loadCert()
+	if err != nil {
+		return nil, err
+	}
+
+	return cs, nil
+}
+
 func main() {
 	service := "swamid-mdq-publisher"
 	hostname, err := os.Hostname()
@@ -211,6 +250,32 @@ func main() {
 			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
 		},
 	}
+
+	if tlsBool {
+		httpServerCertStore, err := newCertStore(serverCert, srvKey)
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("Unable to load x509 HTTP server cert from disk")
+			os.Exit(1)
+		}
+
+		tlsCfg.GetCertificate = httpServerCertStore.getServerCertficate
+
+		go func(*certStore) {
+			sigHup := make(chan os.Signal, 1)
+			signal.Notify(sigHup, syscall.SIGHUP)
+
+			for range sigHup {
+				zlog.Info().Msgf("HUP received")
+				err = httpServerCertStore.loadCert()
+				if err != nil {
+					zlog.Error().Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
+				} else {
+					zlog.Info().Msg("Reloaded x509 HTTP server cert from disk")
+				}
+			}
+		}(httpServerCertStore)
+	}
+
 	httpHandler := chain.Then(mux)
 	srv := http.Server{
 		Addr:         "0.0.0.0:" + port,
@@ -245,7 +310,7 @@ func main() {
 			zlog.Fatal().Err(err).Msg("Missing key: " + srvKey)
 		}
 
-		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != http.ErrServerClosed {
+		if err := srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
 	} else {
