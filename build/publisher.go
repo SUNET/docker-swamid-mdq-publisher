@@ -303,13 +303,6 @@ func main() {
 
 	zlog.Info().Bool("tls", tlsBool).Msg("Starting up")
 	if tlsBool {
-		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
-			zlog.Fatal().Err(err).Msg("Missing cert: " + serverCert)
-		}
-		if _, err := os.Stat(serverKey); errors.Is(err, os.ErrNotExist) {
-			zlog.Fatal().Err(err).Msg("Missing key: " + serverKey)
-		}
-
 		if err := srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
 			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
