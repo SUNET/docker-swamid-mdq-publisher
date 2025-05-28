@@ -5,7 +5,6 @@ import (
 	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"crypto/tls"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
