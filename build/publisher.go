@@ -6,8 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
@@ -47,12 +47,13 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			adresses := strings.Split(header, ",")
 			for _, adress := range adresses {
 				adress := strings.TrimSpace(adress)
-				ip := net.ParseIP(adress)
-				if ip == nil {
-					// Discard non valid X-Forwarded-For
+				ip, err := netip.ParseAddr(adress)
+				if err != nil {
+					fmt.Printf("Not IP %s\n", adress)
 					continue
 				}
-				merged_xffs = append(merged_xffs, ip)
+
+				merged_xffs = append(merged_xffs, ip.String())
 			}
 
 		}
