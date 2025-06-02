@@ -266,7 +266,7 @@ func main() {
 				zlog.Info().Msg("HUP received")
 				err = httpServerCertStore.loadCert()
 				if err != nil {
-					zlog.Error().Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
+					zlog.Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
 				} else {
 					zlog.Info().Msg("Reloaded x509 HTTP server cert from disk")
 				}
