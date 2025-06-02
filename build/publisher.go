@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,7 +47,12 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			adresses := strings.Split(header, ",")
 			for _, adress := range adresses {
 				adress := strings.TrimSpace(adress)
-				merged_xffs = append(merged_xffs, adress)
+				ip := net.ParseIP(adress)
+				if ip == nil {
+					// Discard non valid X-Forwarded-For
+					continue
+				}
+				merged_xffs = append(merged_xffs, ip)
 			}
 
 		}
