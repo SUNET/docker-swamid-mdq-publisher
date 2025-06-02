@@ -267,9 +267,9 @@ func main() {
 				err = httpServerCertStore.loadCert()
 				if err != nil {
 					zlog.Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
-				} else {
-					zlog.Info().Msg("Reloaded x509 HTTP server cert from disk")
+					continue
 				}
+				zlog.Info().Msg("Reloaded x509 HTTP server cert from disk")
 			}
 		}(httpServerCertStore)
 	}
