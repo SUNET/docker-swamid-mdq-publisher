@@ -254,7 +254,6 @@ func main() {
 		httpServerCertStore, err := newCertStore(serverCert, serverKey)
 		if err != nil {
 			zlog.Fatal().Err(err).Msg("Unable to load x509 HTTP server cert from disk")
-			os.Exit(1)
 		}
 
 		tlsCfg.GetCertificate = httpServerCertStore.getServerCertficate
