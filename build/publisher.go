@@ -263,7 +263,7 @@ func main() {
 			signal.Notify(sigHup, syscall.SIGHUP)
 
 			for range sigHup {
-				zlog.Info().Msgf("HUP received")
+				zlog.Info().Msg("HUP received")
 				err = httpServerCertStore.loadCert()
 				if err != nil {
 					zlog.Error().Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
