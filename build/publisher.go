@@ -1,23 +1,31 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1" // #nosec MDQ is based on sha1 hashes
 	"crypto/tls"
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/justinas/alice"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 )
+
+var version = "unspecified"
 
 type myMux struct {
 	baseURL      string
@@ -30,13 +38,28 @@ func (m *myMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	baseURL := m.baseURL
 	documentRoot := m.documentRoot
 
-	xffs := req.Header["X-Forwarded-For"]
-	if len(xffs) > 0 {
-		// From HAProxy's documentation:
-		// Since this header is always appended at the end of the existing header list, the server must be configured to always use the last occurrence of this header only.
-		xff := xffs[len(xffs)-1]
+	incoming_xffs := req.Header["X-Forwarded-For"]
+	merged_xffs := []string{}
+	if len(incoming_xffs) > 0 {
+		// Handle X-Forwarded-For as described by Mozilla
+		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For
+		for _, header := range incoming_xffs {
+			adresses := strings.Split(header, ",")
+			for _, adress := range adresses {
+				adress := strings.TrimSpace(adress)
+				ip, err := netip.ParseAddr(adress)
+				if err != nil {
+					fmt.Printf("Not IP %s\n", adress)
+					continue
+				}
+
+				merged_xffs = append(merged_xffs, ip.String())
+			}
+
+		}
+
 		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str("x_forwarded_for", xff)
+			return c.Strs("x_forwarded_for", merged_xffs)
 		})
 	}
 
@@ -134,11 +157,62 @@ func aliceRequestLoggerChain(zlog zerolog.Logger) alice.Chain {
 	return chain
 }
 
-func main() {
-	zlog := zerolog.New(os.Stdout).With().
+func newLogger(service, hostname string) zerolog.Logger {
+	return zerolog.New(os.Stderr).With().
 		Timestamp().
-		Str("service", "swamid-mdq-publisher").
+		Str("service", service).
+		Str("hostname", hostname).
+		Str("server_version", version).
+		Str("go_version", runtime.Version()).
 		Logger()
+}
+
+type certStore struct {
+	cert *tls.Certificate
+	pem  string
+	key  string
+	mtx  sync.RWMutex
+}
+
+func (cs *certStore) getServerCertficate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	cs.mtx.RLock()
+	defer cs.mtx.RUnlock()
+	return cs.cert, nil
+}
+
+func (cs *certStore) loadCert() error {
+	cert, err := tls.LoadX509KeyPair(cs.pem, cs.key)
+	if err != nil {
+		return fmt.Errorf("unable to load x509 cert: %w", err)
+	}
+	cs.mtx.Lock()
+	cs.cert = &cert
+	cs.mtx.Unlock()
+
+	return nil
+}
+
+func newCertStore(pem string, key string) (*certStore, error) {
+	cs := &certStore{
+		pem: pem,
+		key: key,
+	}
+	err := cs.loadCert()
+	if err != nil {
+		return nil, err
+	}
+
+	return cs, nil
+}
+
+func main() {
+	service := "swamid-mdq-publisher"
+	hostname, err := os.Hostname()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "unable to get hostname, can not setup logging")
+		os.Exit(1)
+	}
+	zlog := newLogger(service, hostname)
 
 	baseURL := getEnv("baseURL", "")
 	documentRoot := getEnv("PUBLISHER_DOCROOT", "/var/www/html")
@@ -157,7 +231,7 @@ func main() {
 	}
 
 	serverCert := getEnv("PUBLISHER_CERT", "/etc/certs/cert.pem")
-	srvKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
+	serverKey := getEnv("PUBLISHER_KEY", "/etc/certs/privkey.pem")
 
 	chain := aliceRequestLoggerChain(zlog)
 
@@ -182,6 +256,31 @@ func main() {
 			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
 		},
 	}
+
+	if tlsBool {
+		httpServerCertStore, err := newCertStore(serverCert, serverKey)
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("Unable to load x509 HTTP server cert from disk")
+		}
+
+		tlsCfg.GetCertificate = httpServerCertStore.getServerCertficate
+
+		go func(*certStore) {
+			sigHup := make(chan os.Signal, 1)
+			signal.Notify(sigHup, syscall.SIGHUP)
+
+			for range sigHup {
+				zlog.Info().Msg("HUP received")
+				err = httpServerCertStore.loadCert()
+				if err != nil {
+					zlog.Err(err).Msg("Unable to reload x509 HTTP server cert from disk")
+					continue
+				}
+				zlog.Info().Msg("Reloaded x509 HTTP server cert from disk")
+			}
+		}(httpServerCertStore)
+	}
+
 	httpHandler := chain.Then(mux)
 	srv := http.Server{
 		Addr:         "0.0.0.0:" + port,
@@ -190,21 +289,32 @@ func main() {
 		Handler:      httpHandler,
 		TLSConfig:    tlsCfg,
 	}
+
+	idleConnsClosed := make(chan struct{})
+	go func(shutdownTimeout time.Duration) {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+
+		zlog.Info().Msgf("Graceful shutdown (timeout %s)", shutdownTimeout)
+
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			zlog.Err(err).Msg("Graceful shutdown failed")
+		}
+		close(idleConnsClosed)
+	}(writeTimeout)
+
 	zlog.Info().Bool("tls", tlsBool).Msg("Starting up")
 	if tlsBool {
-		if _, err := os.Stat(serverCert); errors.Is(err, os.ErrNotExist) {
-			zlog.Fatal().Err(err).Msg("Missing cert: " + serverCert)
-		}
-		if _, err := os.Stat(srvKey); errors.Is(err, os.ErrNotExist) {
-			zlog.Fatal().Err(err).Msg("Missing key: " + srvKey)
-		}
-
-		if err := srv.ListenAndServeTLS(serverCert, srvKey); err != nil {
-			zlog.Fatal().Err(err).Msg("Listen failed")
+		if err := srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
+			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
 	} else {
-		if err := srv.ListenAndServe(); err != nil {
-			zlog.Fatal().Err(err).Msg("Listen failed")
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			zlog.Fatal().Err(err).Msg("Listener failed")
 		}
 	}
+	<-idleConnsClosed
 }
